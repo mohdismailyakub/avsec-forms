@@ -542,6 +542,23 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div><label>Telephone Number</label><input type="tel" id="b_phone" oninput="ucase(this)"></div>
         <div><label>Email (optional, for your confirmation slip)</label><input type="email" id="b_email" placeholder="name@email.com"></div>
         <div><label>Date of Entry</label><input type="date" id="b_date"></div>
+        <div><label>Location / Hangar</label>
+          <select id="b_hangar">
+            <option value="">— Select Location —</option>
+            <option value="Hangar HAS">Hangar HAS</option>
+            <option value="Hangar Miri">Hangar Miri</option>
+            <option value="Hangar Kuching">Hangar Kuching</option>
+          </select></div>
+        <div><label>Visitor or Contractor</label>
+          <select id="b_vtype" onchange="onVtypeChange()">
+            <option value="">— Select Type —</option>
+            <option value="Visitor">Visitor</option>
+            <option value="Contractor">Contractor</option>
+          </select></div>
+        <div class="full"><label>Daily Pass No. Issued (given to visitor)</label>
+          <select id="b_passno" disabled>
+            <option value="">— Select type first —</option>
+          </select></div>
         <div class="full"><label>AVSEC Officer on Duty (receiving your document)</label>
           <select id="b_retby"><option value="">— Select AVSEC Officer —</option></select></div>
         <div class="full"><label>Signature of Visitor</label>
@@ -563,7 +580,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <p class="consent-txt">I hereby confirm that my (Identification Card / Driving Licence / Passport)
         have been returned to me in good condition and safe.</p>
       <div class="grid">
-        <div><label>Daily Pass No. (key in)</label><input type="text" id="r_passno" placeholder="PASS NUMBER" oninput="ucase(this); gateCheck();"></div>
+        <div><label>Daily Pass No. (issued &mdash; locked)</label><input type="text" id="r_passno" class="ro" readonly placeholder="—"></div>
         <div><label>Time Returned (auto)</label><input type="text" id="r_timeauto" class="ro" readonly></div>
         <div><label>Returned by AVSEC on Duty</label>
           <select id="r_retby" onchange="gateCheck()"><option value="">— Select AVSEC Officer —</option></select></div>
@@ -698,10 +715,25 @@ function clearSig(canvasId,labelId){const c=document.getElementById(canvasId);if
   const l=document.getElementById(labelId);if(l)l.style.display='flex';gateCheck();}
 function sigHasInk(id){return !!SIG_INK[id];}
 function sigData(id){try{const c=document.getElementById(id);return (c&&sigHasInk(id))?c.toDataURL('image/png'):'';}catch(e){return '';}}
+function sigDataCompact(id,maxW){try{const c=document.getElementById(id);if(!c||!sigHasInk(id))return '';
+  maxW=maxW||340;const sc=Math.min(1,maxW/c.width);
+  const o=document.createElement('canvas');o.width=Math.round(c.width*sc);o.height=Math.round(c.height*sc);
+  o.getContext('2d').drawImage(c,0,0,o.width,o.height);return o.toDataURL('image/png');}catch(e){return '';}}
 
 // ════════════════ INIT ════════════════
 function fillStaff(selectId){const s=document.getElementById(selectId);if(!s)return;
   AVSEC_STAFF.forEach(o=>{const op=document.createElement('option');op.value=o.name;op.textContent=o.name;s.appendChild(op);});}
+// Build the Daily Pass dropdown (01–30) prefixed V (Visitor) or C (Contractor).
+function onVtypeChange(){
+  const t=val('b_vtype');const sel=document.getElementById('b_passno');if(!sel)return;
+  sel.innerHTML='';
+  if(!t){sel.disabled=true;
+    const o=document.createElement('option');o.value='';o.textContent='— Select type first —';sel.appendChild(o);return;}
+  const prefix=(t==='Contractor')?'C':'V';
+  sel.disabled=false;
+  const o0=document.createElement('option');o0.value='';o0.textContent='— Select Pass No —';sel.appendChild(o0);
+  for(let i=1;i<=30;i++){const code=prefix+String(i).padStart(2,'0');
+    const o=document.createElement('option');o.value=code;o.textContent=code;sel.appendChild(o);}}
 function fillTime(prefix){
   const h=document.getElementById(prefix+'_h');if(!h)return;
   for(let i=1;i<=12;i++){const v=String(i).padStart(2,'0');const o=document.createElement('option');o.value=v;o.textContent=v;h.appendChild(o);}
@@ -732,17 +764,26 @@ function resetForm(){
   document.querySelectorAll('#modeIn input[type=text],#modeIn input[type=tel],#modeIn input[type=email]').forEach(i=>i.value='');
   document.querySelectorAll('#modeIn input[type=date]').forEach(i=>i.value='');
   document.querySelectorAll('#modeIn select').forEach(s=>s.selectedIndex=0);
+  onVtypeChange();  // re-lock the pass dropdown back to disabled state
   const r=document.querySelector('input[name="idtype"][value="IDENTIFICATION CARD"]');if(r)r.checked=true;
   clearSig('sigCanvas1','sigLabel1');
 }
 
 // ════════════════ CHECK-IN SUBMIT ════════════════
 async function submitCheckin(){
-  // minimal validation
-  if(!val('b_name')){alert('Please enter the visitor full name.');return;}
-  if(!val('a_iddoc')){alert('Please enter the document number being retained.');return;}
-  if(!val('b_retby')){alert('Please select the AVSEC officer on duty.');return;}
-  if(!sigHasInk('sigCanvas1')){alert('Visitor signature is required.');return;}
+  // ── validation: collect ALL missing required fields, warn once ──
+  const missing=[];
+  if(!val('b_name'))   missing.push('Full Name of Visitor');
+  if(!val('a_iddoc'))  missing.push('Document Number Retained (IC / Licence / Passport)');
+  if(!val('b_hangar')) missing.push('Location / Hangar');
+  if(!val('b_vtype'))  missing.push('Visitor or Contractor type');
+  if(!val('b_passno')) missing.push('Daily Pass No. Issued');
+  if(!val('b_retby'))  missing.push('AVSEC Officer on Duty');
+  if(!sigHasInk('sigCanvas1')) missing.push('Visitor Signature');
+  if(missing.length){
+    alert('Please complete the following required field(s) before submitting:\n\n•  '+missing.join('\n•  '));
+    return;
+  }
   const em=val('b_email');
   if(em && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){alert('Email format looks wrong. Fix it or leave it blank.');return;}
 
@@ -755,8 +796,9 @@ async function submitCheckin(){
     purpose:val('b_purpose'), visitorName:val('b_name'), company:val('b_company'),
     phone:val('b_phone'), visitorEmail:em, dateOfEntry:val('b_date'),
     retainedBy:st.name||'', retainedStaffId:st.id||'', retainedStaffEmail:st.email||'',
-    receivedAt:now12(),
-    entrySignature:sigData('sigCanvas1')
+    receivedAt:now12(), passNoIssued:val('b_passno'),
+    location:val('b_hangar'), visitorType:val('b_vtype'),
+    entrySignature:sigDataCompact('sigCanvas1',340)
   };
 
   const btn=document.getElementById('btnCheckin');btn.disabled=true;btn.textContent='Submitting…';
@@ -810,10 +852,12 @@ function renderSummary(){
     '<div class="k">Purpose</div><div class="v">'+(e.purpose||'')+'</div>'+
     '<div class="k">Date of Entry</div><div class="v">'+(e.dateOfEntry||'')+'</div>'+
     '<div class="k">Received by</div><div class="v">'+(e.retainedBy||'')+' ('+(e.retainedStaffId||'')+') at '+(e.receivedAt||'')+'</div>'+
+    '<div class="k">Pass No. Issued</div><div class="v">'+(e.passNoIssued||'')+'</div>'+
     '<div class="k">Entry Signature</div><div class="v">'+(e.entrySignature?('<img class="sigimg" src="'+e.entrySignature+'">'):'—')+'</div>'+
     '</div>';
   document.getElementById('returnCard').style.display='block';
-  initSigPad('sigCanvas2','sigLabel2');
+  const rp=document.getElementById('r_passno');if(rp)rp.value=e.passNoIssued||'';
+  initSigPad('sigCanvas2','sigLabel2');gateCheck();
 }
 function gateCheck(){
   const ready = !!ENTRY && !!val('r_passno') && !!val('r_retby') && sigHasInk('sigCanvas2');
@@ -913,7 +957,8 @@ function buildPdf(e, ret){
   fieldRow(x0+PAD,half-3,'Company :',e.company||'');
   fieldRow(x0+PAD+half+3,half-3,'Telephone :',e.phone||'');yy+=7.5;
   fieldRow(x0+PAD,half-3,'Date of Entry :',smartDateTime(e.dateOfEntry));
-  fieldRow(x0+PAD+half+3,half-3,'Time Received :',smartDateTime(e.receivedAt));yy+=9.5;
+  fieldRow(x0+PAD+half+3,half-3,'Time Received :',smartDateTime(e.receivedAt));yy+=7.5;
+  fieldRow(x0+PAD,half-3,'Daily Pass No (issued) :',e.passNoIssued||'');yy+=9.5;
   sigRowImg(x0+PAD,colW,'Signature :',e.entrySignature||'');yy+=9.5;
   fieldRow(x0+PAD,half-3,'Retained by AVSEC on Duty :',e.retainedBy||'');
   fieldRow(x0+PAD+half+3,half-3,'Staff ID :',e.retainedStaffId||'');yy+=9;
@@ -939,6 +984,14 @@ function buildPdf(e, ret){
 // ════════════════ RETURN SUBMIT ════════════════
 async function submitReturn(){
   if(!ENTRY){alert('Record not loaded.');return;}
+  const missing=[];
+  if(!val('r_passno')) missing.push('Daily Pass No. (not loaded from the check-in record)');
+  if(!val('r_retby'))  missing.push('Returned by AVSEC on Duty');
+  if(!sigHasInk('sigCanvas2')) missing.push('Visitor Signature (confirm receipt)');
+  if(missing.length){
+    alert('Please complete the following before confirming return:\n\n•  '+missing.join('\n•  '));
+    return;
+  }
   const st=staffByName(val('r_retby'))||{};
   const ret={passNo:val('r_passno'),timeReturned:val('r_timeauto')||now12(),
     returnedBy:st.name||'',returnedStaffId:st.id||'',returnedStaffEmail:st.email||'',
