@@ -617,11 +617,13 @@ const serializePergerakan = data => {
   lines.push('');
   lines.push('(iii) JUMLAH PELAWAT MASUK: ' + (data.jumlahPelawat || '0'));
   lines.push('');
-  const kenderaan = Array.isArray(data.kenderaanList) ? data.kenderaanList : [];
-  lines.push('(iv) JUMLAH KENDERAAN MASUK: ' + kenderaan.length);
-  kenderaan.forEach((k, i) => {
-    lines.push('    ' + (i + 1) + '. No. Daftar: ' + (k.noDaftar || '-') + ' | Model: ' + (k.model || '-') + ' | Pemandu: ' + (k.pemandu || '-') + ' | Masuk: ' + (k.masaMasuk || '-') + ' | Keluar: ' + (k.masaKeluar || '-'));
-  });
+  lines.push('(iv) JUMLAH KENDERAAN MASUK: ' + (data.kenderaanAda || 'Tiada'));
+  if (data.kenderaanAda === 'Ada') {
+    const kenderaan = Array.isArray(data.kenderaanList) ? data.kenderaanList : [];
+    kenderaan.forEach((k, i) => {
+      lines.push('    ' + (i + 1) + '. No. Daftar: ' + (k.noDaftar || '-') + ' | Model: ' + (k.model || '-') + ' | Pemandu: ' + (k.pemandu || '-') + ' | Masuk: ' + (k.masaMasuk || '-') + ' | Keluar: ' + (k.masaKeluar || '-'));
+    });
+  }
   return lines.join('\n');
 };
 const serializeKronologi = data => {
@@ -1074,6 +1076,7 @@ const App = () => {
       bagasiJumlah: ''
     }],
     jumlahPelawat: '',
+    kenderaanAda: 'Tiada',
     kenderaanList: [{
       id: 'kenderaan-1',
       noDaftar: '',
@@ -1624,7 +1627,11 @@ const App = () => {
     ),
     React.createElement('div', { className: _subCls },
       React.createElement(Label, null, '(iv) Jumlah Kenderaan Masuk'),
-      React.createElement('div', { className: 'space-y-3' },
+      React.createElement(Select, { name: 'kenderaanAda', value: formData.kenderaanAda, onChange: handleChange },
+        React.createElement('option', { value: 'Tiada' }, 'Tiada'),
+        React.createElement('option', { value: 'Ada' }, 'Ada')
+      ),
+      formData.kenderaanAda === 'Ada' && React.createElement('div', { className: 'space-y-3 mt-2' },
         formData.kenderaanList.map((k, kIdx) => React.createElement('div', { key: k.id, className: _cardCls },
           React.createElement('div', { className: 'flex items-center justify-between' },
             React.createElement('div', { className: 'text-[11px] font-bold text-red-900' }, 'Kenderaan ' + (kIdx + 1)),
