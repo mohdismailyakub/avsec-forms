@@ -599,22 +599,20 @@ const serializePergerakan = data => {
       lines.push('   e. Krew Pesawat       : ' + (krew.length ? krew.map(x => x.nama + (x.id ? ' (' + x.id + ')' : '')).join(', ') : '-'));
       const pen = (p.penumpang || []).filter(x => x && x.trim() !== '');
       lines.push('   f. Penumpang          : ' + (pen.length ? pen.join(', ') : '-'));
+      lines.push('');
+      lines.push('   (i) Pemeriksaan Fizikal Ke Atas Grounds Ops: ' + (p.pemeriksaanFizikal || 'Ya'));
+      if (p.pemeriksaanFizikal === 'Tidak') {
+        lines.push('       Remark: ' + (p.pemeriksaanRemark || '-'));
+      } else if (Array.isArray(p.groundOpsList)) {
+        p.groundOpsList.forEach((g, gi) => {
+          const remark = g.remarkPilihan === 'A' ? 'Pemeriksaan badan telah dijalankan, dan tiada barang mencurigakan ditemui.' : (g.remarkManual || '-');
+          lines.push('       ' + (gi + 1) + '. ' + (g.nama || '-') + ' (ID: ' + (g.idPekerja || '-') + ') - ' + remark);
+        });
+      }
+      lines.push('');
+      lines.push('   (ii) Pemeriksaan Barang Bagasi: ' + (p.bagasiPeriksa || 'Tidak'));
+      lines.push('        Jumlah Bag/Bagasi Ke Dalam Pesawat: ' + (p.bagasiJumlah || '0'));
     });
-  }
-  if (data.pergerakanAda === 'Ada') {
-  lines.push('');
-  lines.push('(i) PEMERIKSAAN FIZIKAL KE ATAS GROUNDS OPS: ' + (data.pemeriksaanFizikal || 'Ya'));
-  if (data.pemeriksaanFizikal === 'Tidak') {
-    lines.push('    Remark: ' + (data.pemeriksaanRemark || '-'));
-  } else if (Array.isArray(data.groundOpsList)) {
-    data.groundOpsList.forEach((g, i) => {
-      const remark = g.remarkPilihan === 'A' ? 'Pemeriksaan badan telah dijalankan, dan tiada barang mencurigakan ditemui.' : (g.remarkManual || '-');
-      lines.push('    ' + (i + 1) + '. ' + (g.nama || '-') + ' (ID: ' + (g.idPekerja || '-') + ') - ' + remark);
-    });
-  }
-  lines.push('');
-  lines.push('(ii) PEMERIKSAAN BARANG BAGASI: ' + (data.bagasiPeriksa || 'Tidak'));
-  lines.push('    Jumlah Bag/Bagasi Ke Dalam Pesawat: ' + (data.bagasiJumlah || '0'));
   }
   lines.push('');
   lines.push('(iii) JUMLAH PELAWAT MASUK: ' + (data.jumlahPelawat || '0'));
@@ -1061,20 +1059,20 @@ const App = () => {
       masaKetibaan: '',
       sektor: '',
       krew: [{ nama: '', id: '', manual: false }],
-      penumpang: ['']
+      penumpang: [''],
+      pemeriksaanFizikal: 'Ya',
+      pemeriksaanRemark: '',
+      groundOpsList: [{
+        id: 'go-1',
+        nama: '',
+        idPekerja: '',
+        remarkPilihan: 'A',
+        remarkManual: '',
+        manual: false
+      }],
+      bagasiPeriksa: 'Tidak',
+      bagasiJumlah: ''
     }],
-    pemeriksaanFizikal: 'Ya',
-    pemeriksaanRemark: '',
-    groundOpsList: [{
-      id: 'go-1',
-      nama: '',
-      idPekerja: '',
-      remarkPilihan: 'A',
-      remarkManual: '',
-      manual: false
-    }],
-    bagasiPeriksa: 'Tidak',
-    bagasiJumlah: '',
     jumlahPelawat: '',
     kenderaanList: [{
       id: 'kenderaan-1',
@@ -1168,7 +1166,7 @@ const App = () => {
   const loadChecked = useRef(false);
   const isMasaLengkap = formData.masaLaporan.every(m => m.image !== null && m.caption.trim() !== '');
   const isPergerakanValid = formData.pergerakanAda === 'Tiada' || formData.pesawatList.every(p => p.noDaftar.trim() !== '');
-  const isPemeriksaanValid = formData.pergerakanAda !== 'Ada' || (formData.pemeriksaanFizikal === 'Tidak' ? formData.pemeriksaanRemark.trim() !== '' : formData.groundOpsList.every(g => g.nama.trim() !== '' && g.idPekerja.trim() !== '' && (g.remarkPilihan === 'A' || g.remarkManual.trim() !== '')));
+  const isPemeriksaanValid = formData.pergerakanAda !== 'Ada' || formData.pesawatList.every(p => p.pemeriksaanFizikal === 'Tidak' ? p.pemeriksaanRemark.trim() !== '' : p.groundOpsList.every(g => g.nama.trim() !== '' && g.idPekerja.trim() !== '' && (g.remarkPilihan === 'A' || g.remarkManual.trim() !== '')));
   const isKronologiValid = formData.kronologiList.length > 0 && formData.kronologiList.every(k => k.masa.trim() !== '' && k.kejadian.trim() !== '');
   const isFormValid = formData.tarikh !== '' && formData.lokasi !== '' && formData.syif !== '' && formData.anggota[0] !== '' && isPergerakanValid && isPemeriksaanValid && formData.rondaan.trim() !== '' && isKronologiValid && formData.peralatan.trim() !== '' && isMasaLengkap;
   const senaraiAnggota = ["Alexander Senggai Anak Eli", "Alfizi Harzua Bin Roy Harman", "Amirulddin Bin Razali", "Arwell Bryant Ak Robin", "Harris Bin Juni", "Jason Laweh", "Jerring Anak Nokep", "Jimmy Lujah", "Joperi Bin Panis", "Joseph Ak Jangkui", "Joseph Ranger Ak Francis Nyui", "Lester Vellan Barry", "Mohd Hazicq Ifwat", "Monica anak Candera", "Nur Atiqah Binti Sam", "Presthley Sigau Paulus", "Ricky Anak Eri", "Ritchie Anak Robin Ungkong", "Tarrance Jacius Ding Bin Kiong", "Valentine Asang Jarau"];
@@ -1329,7 +1327,7 @@ const App = () => {
     setFormData(prev => ({ ...prev, pesawatList: prev.pesawatList.map((p, i) => i === index ? { ...p, [field]: value } : p) }));
   };
   const addPesawat = () => {
-    setFormData(prev => ({ ...prev, pesawatList: [...prev.pesawatList, { id: 'pesawat-' + Date.now(), noDaftar: '', masaBerlepas: '', masaKetibaan: '', sektor: '', krew: [{ nama: '', id: '', manual: false }], penumpang: [''] }] }));
+    setFormData(prev => ({ ...prev, pesawatList: [...prev.pesawatList, { id: 'pesawat-' + Date.now(), noDaftar: '', masaBerlepas: '', masaKetibaan: '', sektor: '', krew: [{ nama: '', id: '', manual: false }], penumpang: [''], pemeriksaanFizikal: 'Ya', pemeriksaanRemark: '', groundOpsList: [{ id: 'go-' + Date.now(), nama: '', idPekerja: '', remarkPilihan: 'A', remarkManual: '', manual: false }], bagasiPeriksa: 'Tidak', bagasiJumlah: '' }] }));
   };
   const removePesawat = index => {
     setFormData(prev => ({ ...prev, pesawatList: prev.pesawatList.filter((_, i) => i !== index) }));
@@ -1361,23 +1359,23 @@ const App = () => {
   const removePenumpang = (pIdx, idx) => {
     setFormData(prev => ({ ...prev, pesawatList: prev.pesawatList.map((p, i) => i === pIdx ? { ...p, penumpang: p.penumpang.filter((_, j) => j !== idx) } : p) }));
   };
-  const handleGroundOpsChange = (index, field, value) => {
-    setFormData(prev => ({ ...prev, groundOpsList: prev.groundOpsList.map((g, i) => i === index ? { ...g, [field]: value } : g) }));
+  const handleGroundOpsChange = (pIdx, index, field, value) => {
+    setFormData(prev => ({ ...prev, pesawatList: prev.pesawatList.map((p, i) => i === pIdx ? { ...p, groundOpsList: p.groundOpsList.map((g, j) => j === index ? { ...g, [field]: value } : g) } : p) }));
   };
-  const handleGroundOpsSelect = (gIdx, val) => {
-    setFormData(prev => ({ ...prev, groundOpsList: prev.groundOpsList.map((g, i) => {
-      if (i !== gIdx) return g;
+  const handleGroundOpsSelect = (pIdx, gIdx, val) => {
+    setFormData(prev => ({ ...prev, pesawatList: prev.pesawatList.map((p, i) => i === pIdx ? { ...p, groundOpsList: p.groundOpsList.map((g, j) => {
+      if (j !== gIdx) return g;
       if (val === '__manual__') return { ...g, nama: '', idPekerja: '', manual: true };
       if (val === '') return { ...g, nama: '', idPekerja: '', manual: false };
       const f = SENARAI_GOM.find(x => x.id === val);
       return f ? { ...g, nama: f.nama, idPekerja: f.id, manual: false } : g;
-    }) }));
+    }) } : p) }));
   };
-  const addGroundOps = () => {
-    setFormData(prev => ({ ...prev, groundOpsList: [...prev.groundOpsList, { id: 'go-' + Date.now(), nama: '', idPekerja: '', remarkPilihan: 'A', remarkManual: '', manual: false }] }));
+  const addGroundOps = pIdx => {
+    setFormData(prev => ({ ...prev, pesawatList: prev.pesawatList.map((p, i) => i === pIdx ? { ...p, groundOpsList: [...p.groundOpsList, { id: 'go-' + Date.now(), nama: '', idPekerja: '', remarkPilihan: 'A', remarkManual: '', manual: false }] } : p) }));
   };
-  const removeGroundOps = index => {
-    setFormData(prev => ({ ...prev, groundOpsList: prev.groundOpsList.filter((_, i) => i !== index) }));
+  const removeGroundOps = (pIdx, index) => {
+    setFormData(prev => ({ ...prev, pesawatList: prev.pesawatList.map((p, i) => i === pIdx ? { ...p, groundOpsList: p.groundOpsList.filter((_, j) => j !== index) } : p) }));
   };
   const handleKenderaanChange = (index, field, value) => {
     setFormData(prev => ({ ...prev, kenderaanList: prev.kenderaanList.map((k, i) => i === index ? { ...k, [field]: value } : k) }));
@@ -1565,60 +1563,60 @@ const App = () => {
             p.penumpang.length > 1 && React.createElement('button', { type: 'button', onClick: () => removePenumpang(pIdx, kIdx), className: _remCls }, React.createElement(Trash2, { size: 14 }))
           )),
           React.createElement('button', { type: 'button', onClick: () => addPenumpang(pIdx), className: _addCls }, React.createElement(Plus, { size: 12 }), 'Tambah Penumpang')
+        ),
+        React.createElement('div', { className: _subCls },
+          React.createElement(Label, null, '(i) Pemeriksaan Fizikal Ke Atas Grounds Ops'),
+          React.createElement(Select, { value: p.pemeriksaanFizikal, onChange: e => handlePesawatChange(pIdx, 'pemeriksaanFizikal', e.target.value) },
+            React.createElement('option', { value: 'Ya' }, 'Ya'),
+            React.createElement('option', { value: 'Tidak' }, 'Tidak')
+          ),
+          p.pemeriksaanFizikal === 'Tidak' && React.createElement('div', { className: 'mt-2' },
+            React.createElement(Label, null, 'Remark (Wajib)'),
+            React.createElement(Textarea, { rows: '2', value: p.pemeriksaanRemark, onChange: e => handlePesawatChange(pIdx, 'pemeriksaanRemark', e.target.value), placeholder: 'Nyatakan sebab pemeriksaan tidak dijalankan...' })
+          ),
+          p.pemeriksaanFizikal === 'Ya' && React.createElement('div', { className: 'mt-2 space-y-3' },
+            p.groundOpsList.map((g, gIdx) => React.createElement('div', { key: g.id, className: _cardCls },
+              React.createElement('div', { className: 'flex items-center justify-between' },
+                React.createElement('div', { className: 'text-[11px] font-bold text-red-900' }, 'Grounds Ops ' + (gIdx + 1)),
+                p.groundOpsList.length > 1 && React.createElement('button', { type: 'button', onClick: () => removeGroundOps(pIdx, gIdx), className: _remCls }, React.createElement(Trash2, { size: 14 }))
+              ),
+              React.createElement('div', null,
+                React.createElement(Label, null, 'Nama Handler'),
+                React.createElement(Select, { value: g.manual ? '__manual__' : g.idPekerja, onChange: e => handleGroundOpsSelect(pIdx, gIdx, e.target.value) },
+                  React.createElement('option', { value: '' }, 'Sila Pilih Handler'),
+                  SENARAI_GOM.map(opt => React.createElement('option', { key: opt.id, value: opt.id }, opt.nama + ' (' + opt.id + ')')),
+                  React.createElement('option', { value: '__manual__' }, 'Taip Sendiri (tiada dalam senarai)')
+                ),
+                g.manual ? React.createElement('div', { className: 'grid grid-cols-2 gap-2 mt-2' },
+                  React.createElement(Input, { value: g.nama, onChange: e => handleGroundOpsChange(pIdx, gIdx, 'nama', e.target.value), placeholder: 'Nama' }),
+                  React.createElement(Input, { value: g.idPekerja, onChange: e => handleGroundOpsChange(pIdx, gIdx, 'idPekerja', e.target.value), placeholder: 'ID Pekerja' })
+                ) : (g.idPekerja && React.createElement('div', { className: 'mt-1 text-[11px] text-gray-500 px-1' }, 'ID: ', React.createElement('span', { className: 'font-bold text-red-900' }, g.idPekerja)))
+              ),
+              React.createElement('div', null,
+                React.createElement(Label, null, 'Remark'),
+                React.createElement(Select, { value: g.remarkPilihan, onChange: e => handleGroundOpsChange(pIdx, gIdx, 'remarkPilihan', e.target.value) },
+                  React.createElement('option', { value: 'A' }, 'A - Tiada barang mencurigakan'),
+                  React.createElement('option', { value: 'B' }, 'B - Ada mencurigakan (tulis manual)')
+                ),
+                g.remarkPilihan === 'B' && React.createElement('div', { className: 'mt-1' }, React.createElement(Textarea, { rows: '2', value: g.remarkManual, onChange: e => handleGroundOpsChange(pIdx, gIdx, 'remarkManual', e.target.value), placeholder: 'Nyatakan butiran mencurigakan...' }))
+              )
+            )),
+            React.createElement('button', { type: 'button', onClick: () => addGroundOps(pIdx), className: _addCls }, React.createElement(Plus, { size: 12 }), 'Tambah Grounds Ops')
+          )
+        ),
+        React.createElement('div', { className: _subCls },
+          React.createElement(Label, null, '(ii) Pemeriksaan Barang Bagasi'),
+          React.createElement(Select, { value: p.bagasiPeriksa, onChange: e => handlePesawatChange(pIdx, 'bagasiPeriksa', e.target.value) },
+            React.createElement('option', { value: 'Tidak' }, 'Tidak'),
+            React.createElement('option', { value: 'Ya' }, 'Ya')
+          ),
+          React.createElement('div', { className: 'mt-2' },
+            React.createElement(Label, null, 'Jumlah Bag/Bagasi Ke Dalam Pesawat'),
+            React.createElement(Input, { type: 'number', min: '0', value: p.bagasiJumlah, onChange: e => handlePesawatChange(pIdx, 'bagasiJumlah', e.target.value), placeholder: '0' })
+          )
         )
       )),
       React.createElement('button', { type: 'button', onClick: addPesawat, className: _bigCls }, React.createElement(Plus, { size: 14 }), 'Tambah Pesawat')
-    ),
-    formData.pergerakanAda === 'Ada' && React.createElement('div', { className: _subCls },
-      React.createElement(Label, null, '(i) Pemeriksaan Fizikal Ke Atas Grounds Ops'),
-      React.createElement(Select, { name: 'pemeriksaanFizikal', value: formData.pemeriksaanFizikal, onChange: handleChange },
-        React.createElement('option', { value: 'Ya' }, 'Ya'),
-        React.createElement('option', { value: 'Tidak' }, 'Tidak')
-      ),
-      formData.pemeriksaanFizikal === 'Tidak' && React.createElement('div', { className: 'mt-2' },
-        React.createElement(Label, null, 'Remark (Wajib)'),
-        React.createElement(Textarea, { name: 'pemeriksaanRemark', rows: '2', value: formData.pemeriksaanRemark, onChange: handleChange, placeholder: 'Nyatakan sebab pemeriksaan tidak dijalankan...' })
-      ),
-      formData.pemeriksaanFizikal === 'Ya' && React.createElement('div', { className: 'mt-2 space-y-3' },
-        formData.groundOpsList.map((g, gIdx) => React.createElement('div', { key: g.id, className: _cardCls },
-          React.createElement('div', { className: 'flex items-center justify-between' },
-            React.createElement('div', { className: 'text-[11px] font-bold text-red-900' }, 'Grounds Ops ' + (gIdx + 1)),
-            formData.groundOpsList.length > 1 && React.createElement('button', { type: 'button', onClick: () => removeGroundOps(gIdx), className: _remCls }, React.createElement(Trash2, { size: 14 }))
-          ),
-          React.createElement('div', null,
-            React.createElement(Label, null, 'Nama Handler'),
-            React.createElement(Select, { value: g.manual ? '__manual__' : g.idPekerja, onChange: e => handleGroundOpsSelect(gIdx, e.target.value) },
-              React.createElement('option', { value: '' }, 'Sila Pilih Handler'),
-              SENARAI_GOM.map(opt => React.createElement('option', { key: opt.id, value: opt.id }, opt.nama + ' (' + opt.id + ')')),
-              React.createElement('option', { value: '__manual__' }, 'Taip Sendiri (tiada dalam senarai)')
-            ),
-            g.manual ? React.createElement('div', { className: 'grid grid-cols-2 gap-2 mt-2' },
-              React.createElement(Input, { value: g.nama, onChange: e => handleGroundOpsChange(gIdx, 'nama', e.target.value), placeholder: 'Nama' }),
-              React.createElement(Input, { value: g.idPekerja, onChange: e => handleGroundOpsChange(gIdx, 'idPekerja', e.target.value), placeholder: 'ID Pekerja' })
-            ) : (g.idPekerja && React.createElement('div', { className: 'mt-1 text-[11px] text-gray-500 px-1' }, 'ID: ', React.createElement('span', { className: 'font-bold text-red-900' }, g.idPekerja)))
-          ),
-          React.createElement('div', null,
-            React.createElement(Label, null, 'Remark'),
-            React.createElement(Select, { value: g.remarkPilihan, onChange: e => handleGroundOpsChange(gIdx, 'remarkPilihan', e.target.value) },
-              React.createElement('option', { value: 'A' }, 'A - Tiada barang mencurigakan'),
-              React.createElement('option', { value: 'B' }, 'B - Ada mencurigakan (tulis manual)')
-            ),
-            g.remarkPilihan === 'B' && React.createElement('div', { className: 'mt-1' }, React.createElement(Textarea, { rows: '2', value: g.remarkManual, onChange: e => handleGroundOpsChange(gIdx, 'remarkManual', e.target.value), placeholder: 'Nyatakan butiran mencurigakan...' }))
-          )
-        )),
-        React.createElement('button', { type: 'button', onClick: addGroundOps, className: _addCls }, React.createElement(Plus, { size: 12 }), 'Tambah Grounds Ops')
-      )
-    ),
-    formData.pergerakanAda === 'Ada' && React.createElement('div', { className: _subCls },
-      React.createElement(Label, null, '(ii) Pemeriksaan Barang Bagasi'),
-      React.createElement(Select, { name: 'bagasiPeriksa', value: formData.bagasiPeriksa, onChange: handleChange },
-        React.createElement('option', { value: 'Tidak' }, 'Tidak'),
-        React.createElement('option', { value: 'Ya' }, 'Ya')
-      ),
-      React.createElement('div', { className: 'mt-2' },
-        React.createElement(Label, null, 'Jumlah Bag/Bagasi Ke Dalam Pesawat'),
-        React.createElement(Input, { type: 'number', min: '0', name: 'bagasiJumlah', value: formData.bagasiJumlah, onChange: handleChange, placeholder: '0' })
-      )
     ),
     React.createElement('div', { className: _subCls },
       React.createElement(Label, null, '(iii) Jumlah Pelawat Masuk'),
