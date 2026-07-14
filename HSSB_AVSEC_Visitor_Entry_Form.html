@@ -732,7 +732,7 @@ function onVtypeChange(){
   const prefix=(t==='Contractor')?'C':'V';
   sel.disabled=false;
   const o0=document.createElement('option');o0.value='';o0.textContent='— Select Pass No —';sel.appendChild(o0);
-  for(let i=1;i<=30;i++){const code=prefix+String(i).padStart(2,'0');
+  for(let i=1;i<=100;i++){const code=prefix+String(i).padStart(2,'0');
     const o=document.createElement('option');o.value=code;o.textContent=code;sel.appendChild(o);}}
 function fillTime(prefix){
   const h=document.getElementById(prefix+'_h');if(!h)return;
