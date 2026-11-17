@@ -1014,9 +1014,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 const POWER_AUTOMATE_URL = "https://defaultec6fbce939b34647bd0e6fb29ec14a.96.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/916f10193b454337973b16fd9e455b3f/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=MUeq7prslBoz-6HHiw2fC_O3EXGNCG6VXI_7jMo3u3M";
 
 // Upload the generated PDF (base64) to Power Automate -> OneDrive.
-// Uses no-cors text/plain to avoid CORS preflight issues from a browser/file:// origin.
-// Fire-and-forget: request reaches Power Automate and saves the file, but the browser
-// cannot read the response (opaque). Local download/preview always remains as backup.
+// application/json + CORS only. Status is reported honestly: a no-cors retry would
+// strip the JSON content type and NOT trigger the flow, so there is no fallback.
+// Local download/preview always remains as backup.
 async function uploadToPowerAutomate(base64pdf, filename, meta) {
   if (!POWER_AUTOMATE_URL || POWER_AUTOMATE_URL.trim() === "") {
     return { ok: false, skipped: true };
@@ -1054,18 +1054,8 @@ async function uploadToPowerAutomate(base64pdf, filename, meta) {
     }
     return { ok: false, skipped: false, status: res.status, error: "HTTP " + res.status };
   } catch (e) {
-    // CORS preflight blocked — fall back to fire-and-forget (cannot confirm result)
-    try {
-      await fetch(POWER_AUTOMATE_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: payload
-      });
-      return { ok: true, skipped: false, fireAndForget: true };
-    } catch (e2) {
-      return { ok: false, skipped: false, error: String(e2) };
-    }
+    // Network / CORS failure: the flow did not receive the record.
+    return { ok: false, skipped: false, error: (e && e.message) ? e.message : String(e) };
   }
 }
 
@@ -1487,7 +1477,7 @@ async function submitForm() {
   const checkTop = y;
 
   // returns ending Y for a column
-  function drawChecklist(xs, w, headTitle, paragraph, sections) {
+  function drawChecklist(xs, w, headTitle, paragraph, sections, isActive) {
     let cy = checkTop;
     const tickColW = 7;
     const textW = w - tickColW - 3;
@@ -1515,7 +1505,8 @@ async function submitForm() {
       doc.text(sec.letter + ' ' + sec.title, xs+1.5, cy+3.2);
       cy += 4.6;
       sec.items.forEach(([id, txt]) => {
-        const checked = document.getElementById(id) ? document.getElementById(id).checked : false;
+        // Ticks from the hidden (unselected) panel are never printed.
+        const checked = isActive && (document.getElementById(id) ? document.getElementById(id).checked : false);
         doc.setFont('helvetica','normal'); doc.setFontSize(6.2); doc.setTextColor(...BLACK);
         const lines = doc.splitTextToSize(txt, textW);
         const ih = Math.max(5, lines.length*2.7 + 1.8);
@@ -1533,8 +1524,8 @@ async function submitForm() {
   const paraCheck = 'Aircraft in service, during turn-around or transit stops, shall be subjected to an "aircraft security check" immediately after passenger disembarkation or immediately prior to loading operations.';
   const paraSearch = 'Aircraft shall be subjected to "aircraft security search" prior to entering service, or resuming service after maintenance, or after being parked overnight.';
 
-  const endA = drawChecklist(colAx, colW, '(A) AIRCRAFT CHECK', paraCheck, checkSections);
-  const endB = drawChecklist(colBx, colW, '(B) AIRCRAFT SEARCH', paraSearch, searchSections);
+  const endA = drawChecklist(colAx, colW, '(A) AIRCRAFT CHECK', paraCheck, checkSections, isCheck);
+  const endB = drawChecklist(colBx, colW, '(B) AIRCRAFT SEARCH', paraSearch, searchSections, !isCheck);
   y = Math.max(endA, endB);
 
   // ---------- REMARKS ----------
@@ -1578,7 +1569,8 @@ async function submitForm() {
   clearInterval(intv);
   document.getElementById('progressFill').style.width = '100%';
 
-  const fname = `HSSB_AVSEC_COS_03_${reg}_${date.replace(/-/g,'')}.pdf`;
+  // Unique per record: two checks on the same aircraft/day no longer collide.
+  const fname = `HSSB_AVSEC_COS_03_${reg}_${date.replace(/-/g,'')}_${isCheck ? 'A' : 'B'}_${acStart.replace(':','')}.pdf`;
 
   // Robust output: build a Blob + object URL (works even inside sandboxed previews).
   let blobUrl = null, dataUri = null;
@@ -1624,14 +1616,15 @@ async function submitForm() {
     document.getElementById('progressFill').style.width = '0%';
     // Upload status line
     let uploadMsg = '';
+    const uploaded = !!(uploadResult.ok && !uploadResult.skipped);
+    document.querySelector('#modal .modal-icon').textContent = uploaded ? '\u2705' : '\u26A0\uFE0F';
+    document.querySelector('#modal .modal-title').textContent = uploaded ? 'PDF Generated & Submitted' : 'PDF Generated \u2014 NOT Submitted';
     if (uploadResult.skipped) {
-      uploadMsg = '';   // upload not configured; stay quiet
-    } else if (uploadResult.ok && uploadResult.fireAndForget) {
-      uploadMsg = '<div style="font-size:12px;color:#9a5a10;margin-bottom:10px;font-weight:600;">↑ PDF dihantar ke Power Automate (tak dapat disahkan dari browser — sila semak OneDrive / Run history).</div>';
+      uploadMsg = '<div style="font-size:12px;color:#c0152a;margin-bottom:10px;font-weight:600;">\u26A0 Auto-upload tidak dikonfigurasi. Rekod TIDAK dihantar. Sila muat turun PDF dan serahkan kepada AVSEC.</div>';
     } else if (uploadResult.ok) {
       uploadMsg = '<div style="font-size:12px;color:#1a7a3c;margin-bottom:10px;font-weight:600;">✓ PDF berjaya dihantar ke OneDrive (Power Automate terima: HTTP ' + (uploadResult.status||202) + ').</div>';
     } else {
-      uploadMsg = '<div style="font-size:12px;color:#c0152a;margin-bottom:10px;font-weight:600;">⚠ Auto-upload gagal' + (uploadResult.error ? ' (' + uploadResult.error + ')' : '') + '. Sila muat turun manual.</div>';
+      uploadMsg = '<div style="font-size:12px;color:#c0152a;margin-bottom:10px;font-weight:600;">\u26A0 Auto-upload GAGAL' + (uploadResult.error ? ' (' + uploadResult.error + ')' : '') + '. Rekod TIDAK sampai ke OneDrive dan tiada email dihantar. Sila muat turun PDF dan serahkan kepada AVSEC, atau cuba hantar semula.</div>';
     }
     // Build a rich modal: inline preview + explicit buttons so it works in ANY environment
     const body = document.getElementById('modalBody');
@@ -1640,7 +1633,9 @@ async function submitForm() {
       ? '<div style="border:1px solid #e2e2e2;border-radius:10px;padding:24px 16px;text-align:center;background:#faf9f7;">' +
           '<div style="font-size:44px;line-height:1;margin-bottom:8px;">\uD83D\uDCC4</div>' +
           '<div style="font-family:Rajdhani,sans-serif;font-weight:700;font-size:15px;color:#0d2d6b;word-break:break-all;">' + fname + '</div>' +
-          '<div style="font-size:12px;color:#1a7a3c;font-weight:600;margin-top:8px;">\u2713 PDF sudah dijana &amp; dihantar</div>' +
+          (uploaded
+            ? '<div style="font-size:12px;color:#1a7a3c;font-weight:600;margin-top:8px;">\u2713 PDF sudah dijana &amp; dihantar</div>'
+            : '<div style="font-size:12px;color:#c0152a;font-weight:600;margin-top:8px;">\u26A0 PDF dijana tetapi BELUM dihantar</div>') +
         '</div>'
       : '<iframe src="' + previewSrc + '" style="width:100%;height:280px;border:1px solid #ddd;border-radius:6px;" title="PDF preview"></iframe>';
     body.innerHTML =
@@ -1657,7 +1652,9 @@ async function submitForm() {
       '</div>' +
       previewBlock +
       '<div style="font-size:11px;color:#999;margin-top:10px;line-height:1.5;">' +
-        'Salinan PDF telah dihantar ke OneDrive dan email penama secara automatik. ' +
+        (uploaded
+          ? 'Salinan PDF telah dihantar ke OneDrive dan email penama secara automatik. '
+          : 'Rekod ini BELUM masuk ke OneDrive. ') +
         'Guna butang di atas untuk buka atau muat turun salinan anda.' +
       '</div>';
     document.getElementById('modal').classList.add('active');
