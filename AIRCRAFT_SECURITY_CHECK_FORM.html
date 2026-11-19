@@ -1301,7 +1301,7 @@ function resetForm() {
   document.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = false);
   ['acFrom','acTo','acPrevOrigin','remarks','avsecName','picName','acType'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('acReg').value = '';
-  document.getElementById('acDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('acDate').value = localDateISO();
   document.getElementById('acStartTime').value = '';
   document.getElementById('acEndTime').value = '';
   document.getElementById('typeTag').textContent = '';
@@ -1686,7 +1686,13 @@ function validateTime24(el) {
 }
 
 function closeModal() { document.getElementById('modal').classList.remove('active'); }
-document.getElementById('acDate').value = new Date().toISOString().split('T')[0];
+// Today's date in the device's local time (MYT), as YYYY-MM-DD.
+// toISOString() is UTC and gave yesterday's date before 08:00 MYT.
+function localDateISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+document.getElementById('acDate').value = localDateISO();
 // Default: show only Check (A) column on load
 setType('check');
 </script>
